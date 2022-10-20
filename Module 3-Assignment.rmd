@@ -1,0 +1,255 @@
+---
+title: "Module 3-Assignment"
+author: "Andreas Xenofontos"
+date: "2022-09-29"
+output: html_document
+---
+
+```{r}
+setwd("~/OneDrive - University of New Haven/Fall 2022/BANL 6320-Supervised Machine Learning/Module 3")
+mtdata <- mtcars
+#Standardize data
+data.std<- scale(mtdata)
+#partition data into training and test(validation) subsets
+set.seed(1905)
+split <- sample(nrow(data.std),nrow(data.std)*0.75) #75-25 split is used.
+mtdata.train <- as.data.frame(data.std[split,])
+mtdata.test <- as.data.frame(data.std[-split,])
+dim(mtdata.train)
+
+```
+```{r}
+dim(mtdata.train)
+```
+
+
+#Linear Regression
+```{r}
+#training the model
+lr.model <- lm(mpg~ ., data = mtdata.train)
+summary(lr.model)
+```
+#testing the model
+```{r}
+pred.lm.mpg <- predict(lr.model,mtdata.test)
+pred.lm.mpg <- data.frame(pred.lm.mpg)
+str(mtdata.test)
+```
+
+```{r}
+mtdata.test
+```
+
+```{r}
+#ModelPerformance
+lm.error <- as.matrix(pred.lm.mpg- mtdata.test[,1])
+lm.sq.error <- lm.error^2
+meansqerror <- mean(lm.sq.error)
+meanabserror <- mean(abs(lm.error))
+rsquare <- cor(pred.lm.mpg , mtdata.test[,1])^2
+meanabspererror <- mean (abs(lm.error/mtdata.test[,1]))
+
+linmod.per <- data.frame(rsquare,meanabserror,meanabspererror)
+linmod.per <-round(linmod.per,digits = 3)
+colnames(linmod.per) <- c("Rsquare", "MAE", "MAPE")
+rownames(linmod.per) <- "Results"
+linmod.per
+```
+#Lasso Regression
+```{r}
+#Split data into train and test datasets
+set.seed(2905)
+split2 <- sample(nrow(data.std),nrow(data.std)*0.75)
+x.lassotrain<- as.matrix(data.std)[split2,]
+x.lassotest<- as.matrix(data.std)[-split2,]
+y.lassotrain<- data.std[split2, "mpg"]
+y.lassotest<- data.std[-split2, "mpg"]
+nrow(data.std)
+```
+
+```{r}
+#Initial Lasso model with alpha=1
+library(glmnet)
+lasso.mpg<- glmnet(x=x.lassotrain, y=y.lassotrain, family = "gaussian", alpha = 1)
+plot(lasso.mpg, xvar = "lambda", label=TRUE)
+```
+```{r}
+#Cross Validation in LASSO (Training the Lasso model for best lambda)
+cv.lasso <- cv.glmnet(x=x.lassotrain, y=y.lassotrain, family = "gaussian", nfolds = 10)
+```
+
+```{r}
+cvplot<-plot(cv.lasso)
+```
+
+```{r}
+best.lambda.lasso <- cv.lasso$lambda.min
+#test the Lasso model
+#best.lasso.model <- glmnet(newx = x.test, y.test, alpha = 0, lambda = best.lambda)
+#coef(best.lasso.model)
+#predictions
+pred.lasso.mpg <- predict(lasso.mpg, newx = x.lassotest, s=best.lambda.lasso)
+pred.lasso.mpg <- data.frame(as.numeric(pred.lasso.mpg))
+pred.lasso.mpg
+```
+
+```{r}
+str(pred.lasso.mpg)
+```
+
+```{r}
+#ModelPerformance lasso
+lasso.error <- as.matrix(pred.lasso.mpg- y.lassotest)
+lasso.sq.error <- lasso.error^2
+MeanSqError <- mean(lasso.sq.error)
+MeanAbsError <- mean(abs(lasso.error))
+Rsquare <- cor(pred.lasso.mpg , y.lassotest)^2
+MeanAbsPerError <- mean (abs(lasso.error/y.lassotest))
+
+lasso.per <- data.frame(Rsq=Rsquare,MAE=MeanAbsError,MAPE= MeanAbsPerError, BestLambda=best.lambda.lasso)
+colnames(lasso.per) <- c("Rsquare", "MAE", "MAPE", "Best L")
+rownames(lasso.per) <- "Results"
+lasso.per <-round(lasso.per,digits = 4)
+lasso.per
+
+```
+#Ridge Regression
+```{r}
+#Split data into train and test datasets
+set.seed(3905)
+split3 <- sample(nrow(data.std),nrow(data.std)*0.7)
+x.ridgetrain<- as.matrix(data.std)[split3,]
+x.ridgetest<- as.matrix(data.std)[-split3,]
+y.ridgetrain<- data.std[split3, "mpg"]
+y.ridgetest<- data.std[-split3, "mpg"]
+nrow(x.ridgetrain)
+```
+
+```{r}
+#Initial Ridge model with alpha=0
+ridge.mpg<- glmnet(x=x.ridgetrain, y=y.ridgetrain, family = "gaussian", alpha = 0)
+plot(ridge.mpg, xvar = "lambda", label=TRUE)
+```
+
+```{r}
+#Cross Validation in LASSO (Training the Lasso model for best lambda)
+cv.ridge <- cv.glmnet(x=x.ridgetrain, y=y.ridgetrain, family = "gaussian", nfolds = 10)
+```
+```{r}
+plot(cv.ridge)
+```
+
+```{r}
+best.lambda.ridge <- cv.ridge$lambda.min
+#predictions
+pred.ridge.mpg <- predict(ridge.mpg, newx = x.ridgetest, s=best.lambda.ridge)
+pred.ridge.mpg <- data.frame(as.numeric(pred.ridge.mpg))
+pred.ridge.mpg
+
+```
+
+```{r}
+#ModelPerformance Ridge
+ridge.error <- as.matrix(pred.ridge.mpg- y.ridgetest)
+ridge.sq.error <- ridge.error^2
+MeanSqError <- mean(ridge.sq.error)
+MeanAbsError <- mean(abs(ridge.error))
+Rsquare <- cor(pred.ridge.mpg , y.ridgetest)^2
+
+MeanAbsPerError <- mean (abs(ridge.error/y.ridgetest))
+ridge.per <- data.frame(Rsq=Rsquare,MAE=MeanAbsError,MAPE= MeanAbsPerError, BestLambda=best.lambda.ridge)
+colnames(lasso.per) <- c("Rsquare", "MAE", "MAPE", "Best L")
+rownames(lasso.per) <- "Results"
+ridge.per <-round(lasso.per,digits = 4)
+ridge.per
+```
+#Stepwise Linear Regression
+```{r}
+#training the model
+step.model.b <- step(lr.model, direction = "backward")
+```
+
+```{r}
+step.model.f <- step(lr.model, direction = "forward")
+```
+
+```{r}
+#testing the model
+pred.step.model.b <- predict(step.model.b,mtdata.test[,-1])
+pred.step.model.b <- data.frame(pred.step.model.b)
+
+pred.step.model.f <- predict(step.model.f,mtdata.test)
+pred.step.model.f <- data.frame(pred.step.model.f)
+
+#ModelPerformance
+library(forecast)
+```
+
+```{r}
+step.model.error.b <- as.matrix(pred.step.model.b- mtdata.test[,1])
+step.model.error.f <- as.matrix(pred.step.model.f- mtdata.test[,1])
+step.model.sq.error.b <- step.model.error.b^2
+step.model.sq.error.f <- step.model.error.f^2
+meansqerror.b <- mean(step.model.error.b)
+meansqerror.f <- mean(step.model.error.f)
+meanabserror.b <- mean(abs(step.model.error.b))
+meanabserror.f <- mean(abs(step.model.error.f))
+rsquare.b <- cor(pred.step.model.b , mtdata.test[,1])^2
+rsquare.f <- cor(pred.step.model.f , mtdata.test[,1])^2
+meanabspererror.b <- mean (abs(step.model.error.b/mtdata.test[,1]))
+meanabspererror.f <- mean (abs(step.model.error.f/mtdata.test[,1]))
+
+step.model.b.per <- data.frame(rsquare.b,meanabserror.b,meanabspererror.b)
+step.model.f.per <- data.frame(rsquare.f,meanabserror.f,meanabspererror.f)
+step.model.b.per <-round(step.model.b.per,digits = 3)
+step.model.f.per <-round(step.model.f.per,digits = 3)
+colnames(step.model.b.per) <- c("Rsquare", "MAE", "MAPE")
+colnames(step.model.f.per) <- c("Rsquare", "MAE", "MAPE")
+rownames(step.model.b.per) <- "Results"
+rownames(step.model.f.per) <- "Results"
+step.model.b.per
+
+```
+
+```{r}
+step.model.f.per
+
+```
+#Comparison of four models
+```{r}
+perf.data <- rbind(linmod.per,step.model.b.per,step.model.f.per, lasso.per[,-4], ridge.per[,-4])
+comparison <- as.matrix(perf.data, nrow = 4, ncol = 4, byrow = T)
+colnames(comparison) <- c("Rsq", "MAE","MAPE")
+rownames(comparison) <- c("Least Squares", "Stepwise-Backward","Stepwise-Forward", "Lasso", "Ridg
+e")
+comparison
+```
+```{r}
+#Linear
+pred.lm.mpg.train <- predict(lr.model,mtdata.train)
+#Stepwise
+pred.step.model.b.train <- predict(step.model.b,mtdata.train[,-1])
+pred.step.model.f.train <- predict(step.model.f,mtdata.train[,-1])
+#Lasso
+pred.lasso.mpg.train <- predict(lasso.mpg, newx = x.lassotrain, s=best.lambda.lasso)
+#Ridge
+pred.ridge.mpg.train <- predict(ridge.mpg, newx = x.ridgetrain, s=best.lambda.ridge)
+std.train.data <- mtdata.train[,1]
+
+RSQ_LM <-cor(pred.lm.mpg.train,mtdata.train[,1])^2
+RSQ_StepBack<-cor(pred.step.model.b.train,mtdata.train[,1])^2
+RSQ_StepFor<-cor(pred.step.model.f.train,mtdata.train[,1])^2
+RSQ_Lasso<-cor(pred.lasso.mpg.train,y.lassotrain)^2
+RSQ_Ridge<-cor(pred.ridge.mpg.train,y.ridgetrain)^2
+
+train.comp <- data.frame(RSQ_LM,RSQ_StepBack,RSQ_StepFor,RSQ_Lasso,RSQ_Ridge)
+colnames(train.comp)<-c("RSQ_LM","RSQ_StepBack","RSQ_StepFor","RSQ_Lasso","RSQ_Ridge")
+train.comp <- round(train.comp,digits = 2)
+train.comp
+
+```
+
+#Interpretation Lasso and Ridge models showed seem to have a better performance compared to least squares and
+#stepwise models. However, the Rsq of 1 is concerning. The model fits to the test dataset perfectly since the RSQ
+#obtained from Lasso and Ridge on the training datasets.I would argue that the ideal model in this case is Step-wise -
+#Backward regression since training Rrq=0.9 and testing Rsq=0.857 with a relatively small mean of absolute error.
